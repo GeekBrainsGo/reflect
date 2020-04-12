@@ -36,12 +36,19 @@ func ParseFlags(str interface{}, args []string) error {
 
 		switch fieldT.Type.Kind() {
 		case reflect.String:
-			fieldV.SetString(flags[flag])
+			fieldV.SetString(flags[flag][0])
 		case reflect.Bool:
 			fieldV.SetBool(true)
 		case reflect.Int, reflect.Int64:
-			iVal, _ := strconv.ParseInt(flags[flag], 10, 64)
+			iVal, _ := strconv.ParseInt(flags[flag][0], 10, 64)
 			fieldV.SetInt(iVal)
+		case reflect.Slice:
+			slice := reflect.MakeSlice(reflect.TypeOf(flags[flag]), len(flags[flag]), len(flags[flag]))
+			for i, value := range flags[flag] {
+				slice.Index(i).Set(reflect.ValueOf(value))
+			}
+			fieldV.Set(slice)
+
 		default:
 			return fmt.Errorf("unexpected field type: %s", fieldT.Type.Kind().String())
 		}
@@ -75,7 +82,7 @@ func getAliases(str interface{}) (Aliases, error) {
 	return aliases, nil
 }
 
-type Flags map[string]string
+type Flags map[string][]string
 
 func getFlags(args []string) (Flags, error) {
 	flags := Flags{}
@@ -87,13 +94,10 @@ func getFlags(args []string) (Flags, error) {
 		if len(parts) > 1 {
 			val = parts[1]
 		}
-
-		if _, exists := flags[name]; exists {
-			return nil, fmt.Errorf("dublicate flag: %s", name)
-		}
-
 		val = strings.Trim(val, `"`)
-		flags[name] = val
+		slice := flags[name]
+		slice = append(slice, val)
+		flags[name] = slice
 	}
 
 	return flags, nil
